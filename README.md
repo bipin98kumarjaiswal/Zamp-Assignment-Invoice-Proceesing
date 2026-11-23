@@ -5,7 +5,7 @@ A small app I built that reads a vendor invoice PDF and decides what to do with 
 I made this for the Zamp AI Solutions Analyst case study, **PS-1: Invoice processing, from PDF to decision**.
 
 **Live app:** [Open the live app](https://zamp-assignment-invoice-proceesing-ldm272pjnb2gdmcybcmcff.streamlit.app/process) 
-![Process invoice](docs/screenshots/02-process-01-clean.png)
+
 
 ---
 
