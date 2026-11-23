@@ -4,7 +4,7 @@ A small app I built that reads a vendor invoice PDF and decides what to do with 
 
 I made this for the Zamp AI Solutions Analyst case study, **PS-1: Invoice processing, from PDF to decision**.
 
-**Live app:** `[https://YOUR-APP-NAME.streamlit.app](https://zamp-assignment-invoice-proceesing-ldm272pjnb2gdmcybcmcff.streamlit.app/process)` 
+**Live app:** [Open the live app](https://zamp-assignment-invoice-proceesing-ldm272pjnb2gdmcybcmcff.streamlit.app/process) 
 ![Process invoice](docs/screenshots/02-process-01-clean.png)
 
 ---
@@ -155,6 +155,26 @@ docs/                 screenshots and browser test results
 ```
 
 More detail: [ARCHITECTURE.md](ARCHITECTURE.md), [DEMO.md](DEMO.md), [TEST_REPORT.md](TEST_REPORT.md).
+
+## Demo management (admin only)
+
+The Overview page includes password-protected **Demo management** controls if you configure
+`ADMIN_PASSWORD` as a Streamlit secret (or local environment variable). Use a strong
+password and never add it to GitHub.
+
+- **Delete selected invoice** removes the selected invoice plus its linked review re-checks,
+  attached PDF, audit entries and review actions. Any approved PO commitment is reversed
+  within the same database transaction.
+- **Reset demo history** clears all invoice activity and restores the original seeded
+  purchase-order commitments without deleting the master vendors or purchase orders.
+
+Each action requires a typed confirmation. They are irreversible and are intended for
+synthetic demo data, not production accounts. The old unprotected sidebar reset has been
+removed. For Streamlit Community Cloud add a separate secret:
+```toml
+ADMIN_PASSWORD = "REPLACE_WITH_A_LONG_RANDOM_SECRET"
+```
+Never share your actual password or commit it into a repository.
 
 ## Limitations
 
