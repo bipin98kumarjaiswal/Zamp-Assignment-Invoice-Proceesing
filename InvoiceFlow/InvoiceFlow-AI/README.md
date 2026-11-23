@@ -1,89 +1,177 @@
 # InvoiceFlow AI
-**Intelligent invoice processing and decision automation** — Zamp AI Solutions Analyst case study, problem statement PS-1 (Finance / AP: *Invoice processing — from PDF to decision*).
 
-Upload a vendor invoice PDF. InvoiceFlow extracts the data (text layer, or OCR for scans), matches it to a purchase order, runs deterministic financial and duplicate checks, and produces a **reasoned, auditable decision**: `APPROVED`, `REVIEW` or `REJECTED`. It never pays anything.
+A small app I built that reads a vendor invoice PDF and decides what to do with it: **approve**, **send for review**, or **reject**. It also explains *why*, so a person can check the reasoning quickly.
 
-## What makes it trustworthy
-| Principle | How it is enforced |
+I made this for the Zamp AI Solutions Analyst case study, **PS-1: Invoice processing, from PDF to decision**.
+
+**Live app:** `[https://YOUR-APP-NAME.streamlit.app](https://zamp-assignment-invoice-proceesing-ldm272pjnb2gdmcybcmcff.streamlit.app/process)` 
+![Process invoice](docs/screenshots/02-process-01-clean.png)
+
+---
+
+## The problem I picked
+
+In a finance team, someone opens every emailed invoice, finds the matching purchase order (PO) in a spreadsheet, checks the numbers, and decides what to do. It is slow and boring, and a tired person can easily miss a duplicate or a wrong amount.
+
+I wanted to automate the first pass, so people only look at the invoices that really need a human. The app never pays anything. It only gives a decision with the reasons.
+
+## What it does
+
+You upload a PDF and it goes through 10 steps, which you can watch live:
+
+1. Document received (and hashed)
+2. File validation
+3. Text extraction (or OCR if it is a scan)
+4. Pulling out the fields (vendor, invoice number, dates, line items, tax, total)
+5. Data validation
+6. Matching the vendor and purchase order
+7. Financial checks (the maths, tolerances, PO balance)
+8. Duplicate detection
+9. Decision
+10. Saving an audit record
+
+Possible decisions:
+
+- **Approved** if every rule passes.
+- **Review** if something is missing, uncertain or doesn't add up.
+- **Rejected** only for a confirmed duplicate of an already approved invoice, or a blocked vendor.
+
+I kept "review" and "rejected" separate on purpose. Not being sure about an invoice is not the same as knowing it is bad.
+
+## Design choices I made (and why)
+
+- **The AI does not decide anything.** All the approval logic is normal code, so the same invoice always gives the same answer. There is an optional OpenAI step for extraction, but it is off by default. It can only fill fields that are missing, and the value has to appear in the document text.
+- **It never guesses missing data.** If the invoice number, date, currency, total or PO is missing, the invoice goes to review. If the PO is missing, the app may *suggest* one but never applies it.
+- **Scanned invoices always go to a person.** OCR can misread a digit, and one wrong digit changes a payment, so I don't auto-approve anything read by OCR.
+- **There is no "approve" button in the Review Center.** A reviewer can correct things like the PO number or invoice number, and then the same rules run again. They can't edit amounts. This way nobody can approve a bad invoice just by clicking.
+- **Duplicates are checked in several ways:** the file hash (so renaming the file doesn't help), vendor plus a cleaned-up invoice number (`INV-0042` and `inv42` count as the same), and vendor plus amount plus date. The database also has unique constraints, so two people uploading the same invoice at the same moment can't both get approved.
+- **Currencies are never added together.** USD and INR totals are shown separately.
+
+## The six pages
+
+| Page | What it shows |
 |---|---|
-| AI never approves | Approval comes only from deterministic rules in `app/core`. The optional OpenAI step can only *fill missing fields*, each value must appear verbatim in the document, and its confidence is capped below the approval threshold. |
-| Never invent data | A missing invoice number, date, currency, total or PO stays missing and forces `REVIEW`. A PO is never guessed (suggestions are shown, not applied). |
-| Uncertainty → human | Low-confidence fields, OCR-read documents, ambiguous POs/vendors, conflicting figures → `REVIEW`. |
-| No back door | The Review Center has **no approve button**. Reviewers correct identity fields (vendor, number, date, currency, PO) and the *same rules re-run*. Amounts cannot be edited. |
-| Duplicates can't slip through | Checks on file hash (renaming does nothing), vendor + normalised invoice number, and vendor + amount + date. Database unique constraints close the concurrent-submission race. |
-| Everything is explained | Each run stores 10 stage results, every check with evidence, the arithmetic, the explanation and the next action. |
+| Overview | Totals, value per currency, decision chart, trend, recent activity (all read from the database) |
+| Process invoice | Upload a PDF, preview it, watch the stages run, see the decision and explanation |
+| Invoice history | Search and filter all runs, download CSV, click a row to open it |
+| Review center | Invoices that need a person, with reasons, evidence, and actions (correct and re-check, draft a vendor message, reject, add note) |
+| Purchase orders | The 15 fictional POs with committed and remaining balances |
+| Run details | Everything about one run, including the audit trail |
 
-## Features (six views)
-Overview dashboard · Process invoice (live 10-stage run view) · Invoice history (search/filter/CSV) · Review center · Purchase orders (15 fictional POs) · Run details (full audit of one run).
+| Overview | Review center |
+|---|---|
+| ![Overview](docs/screenshots/03-overview.png) | ![Review center](docs/screenshots/06-review-detail.png) |
 
-## Decision rules (summary)
-* **APPROVED** — all required fields found with ≥80% confidence; vendor ACTIVE and in master; PO exists, OPEN/PARTIALLY_BILLED, owned by that vendor, same currency; lines match PO lines; qty ≤ PO qty; unit prices within ±2%; tax rate equals PO; line×price, subtotal, discount, tax and total reconcile within 0.02; net amount ≤ remaining PO balance (+2% of PO value tolerance); no duplicate; not OCR-read.
-* **REJECTED** — confirmed duplicate of an *approved* invoice (same file hash, or same vendor + normalised invoice number), or vendor status BLOCKED.
-* **REVIEW** — everything else that fails or is uncertain. Rejection is never used for "needs a human".
+## Sample invoices
 
-Tolerances, rounding rule (half-up, 2 dp) and all assumptions are in `ARCHITECTURE.md`.
+All data is made up. There are 7 PDFs in `sample_data/invoices/`. Process them in this order on a fresh database:
 
-## Edge cases built and demonstrated
-1. **Re-formatted duplicate** (`04-duplicate.pdf`): different layout, date format and invoice-number punctuation, so the file hash differs, yet it is caught and rejected.
-2. **Scanned invoice** (`07-scanned.pdf`): OCR fallback reads it at ~95% confidence, but policy sends OCR-read invoices to a person; the reviewer attests and the rules re-run.
-3. **Over budget vs remaining PO balance** (`06-over-budget.pdf`) — plus cumulative commitments, split billing and concurrent approvals (race guards).
-4. **Vendor/PO mismatch** (`05`) and **missing PO** (`03`, with a non-binding suggestion).
+| # | File | What it tests | Result |
+|---|---|---|---|
+| 1 | `01-clean.pdf` | Everything correct | Approved |
+| 2 | `02-small-variance.pdf` | Price 0.95% higher than the PO, within tolerance | Approved (with a note) |
+| 3 | `03-missing-po.pdf` | No PO number on the invoice | Review |
+| 4 | `04-duplicate.pdf` | Same invoice as #1 but a different layout and number format | Rejected |
+| 5 | `05-vendor-mismatch.pdf` | PO belongs to a different vendor | Review |
+| 6 | `06-over-budget.pdf` | More than the remaining PO balance | Review |
+| 7 | `07-scanned.pdf` | Image-only scan, needs OCR | Review |
 
-## Quick start (local, no API key needed)
-Requires Python 3.11+ and the Tesseract OCR binary (only needed for scanned PDFs).
+Note: `04` is only rejected because `01` was approved first. On a fresh database, `04` alone is a valid invoice and gets approved.
+
+## How to run it on your computer
+
+You need Python 3.11 or newer. Tesseract is only needed for the scanned sample.
 
 ```bash
-# 1. Tesseract (optional but recommended)
-#    Ubuntu/Debian: sudo apt-get install tesseract-ocr
-#    macOS:         brew install tesseract
-#    Windows:       install from https://github.com/UB-Mannheim/tesseract/wiki and add it to PATH
+# 1. (optional) install Tesseract for OCR
+#    Windows: https://github.com/UB-Mannheim/tesseract/wiki  (add it to PATH)
+#    Mac:     brew install tesseract
+#    Ubuntu:  sudo apt-get install tesseract-ocr
 
-# 2. Environment
+# 2. create a virtual environment and install packages
 python -m venv .venv
-source .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install -r requirements-dev.txt  # runtime + pytest + reportlab
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
 
-# 3. Run
-streamlit run streamlit_app.py       # opens http://localhost:8501
+# 3. start the app
+streamlit run streamlit_app.py
 ```
-A local SQLite database is created at `data/invoiceflow.db` on first start and seeded with 9 vendors and 15 POs.
 
-## Run the tests
+It opens at http://localhost:8501. On first start it creates a local SQLite database in `data/` and fills it with 9 vendors and 15 purchase orders. No API key is needed.
+
+## Tests
+
 ```bash
-python -m pytest tests -q                       # SQLite (default)
-TEST_DATABASE_URL=postgresql://user:pw@localhost:5432/db python -m pytest tests -q   # same suite on PostgreSQL
-python scripts/run_sample_sequence.py           # 7 sample invoices, fresh DB, exits 0 only if all decisions match
+python -m pytest tests -q
+python scripts/run_sample_sequence.py
 ```
 
-## Configuration (environment variables or Streamlit secrets)
-| Variable | Default | Meaning |
+What I actually ran:
+
+- 100 tests pass on SQLite, and the same 100 pass on a local PostgreSQL 16 (including tests for simultaneous uploads).
+- 27 checks pass in a real browser (headless Chromium): uploading the 7 PDFs, search, the review flow, and data surviving a server restart.
+- Browser testing found a real bug that the unit tests missed (a crash after a reviewer re-check), so I fixed it and added a test for it.
+
+More detail is in `TEST_REPORT.md`.
+
+## Settings
+
+Settings can be environment variables, a local `.env` file, or Streamlit secrets. `.env.example` lists them all. Never commit real passwords or keys.
+
+| Setting | Default | Meaning |
 |---|---|---|
-| `DATABASE_URL` | local SQLite | `postgresql://…` for Supabase/Postgres (`postgres://` also accepted) |
-| `PRICE_TOLERANCE_PCT` | `2.0` | unit-price variance allowed vs PO; PO-balance overrun allowed as % of PO value |
-| `ARITHMETIC_TOLERANCE` | `0.02` | absolute rounding tolerance when re-adding invoice figures |
-| `MIN_FIELD_CONFIDENCE` | `0.80` | critical fields below this force REVIEW |
-| `MAX_FILE_MB` / `MAX_PAGES` | `5` / `10` | upload limits |
-| `OCR_ENABLED` / `OCR_DPI` | `true` / `200` | OCR fallback |
-| `USE_AI_EXTRACTION`, `OPENAI_API_KEY`, `OPENAI_MODEL` | off | optional AI-assisted extraction (`pip install -r requirements-ai.txt`) |
-| `ALLOW_DB_RESET` | on for SQLite, off for Postgres | shows "Reset demo database" |
-| `UI_STAGE_PAUSE` | `0.18` | cosmetic pause between stages in the live view (results are always real); `0` disables |
+| `DATABASE_URL` | local SQLite | Use a `postgresql://...` link for a hosted database |
+| `PRICE_TOLERANCE_PCT` | 2.0 | Allowed price difference vs the PO |
+| `MIN_FIELD_CONFIDENCE` | 0.80 | Below this, a key field is treated as uncertain |
+| `MAX_FILE_MB` | 5 | Upload size limit |
+| `USE_AI_EXTRACTION` | false | Optional AI-assisted extraction |
+| `ALLOW_DB_RESET` | true for SQLite, false for PostgreSQL | Shows the reset button |
 
-See `.env.example`. **Never commit real credentials.**
+## Deployment
 
-## Project layout
+I deploy it on **Streamlit Community Cloud** with a free **Supabase** PostgreSQL database, so the history is kept even when the app restarts.
+
+1. Push this repo to GitHub (the file `streamlit_app.py` must be at the top level).
+2. Create a free Supabase project and copy the **Session pooler** connection string.
+3. On share.streamlit.io, create an app from this repo with main file `streamlit_app.py`.
+4. In the app's **Secrets**, add:
+   ```toml
+   DATABASE_URL = "postgresql://postgres.xxxx:YOURPASSWORD@aws-0-xx.pooler.supabase.com:5432/postgres"
+   ALLOW_DB_RESET = "false"
+   ```
+5. `packages.txt` installs Tesseract automatically, so OCR works online too.
+
+## Project structure
+
 ```
-streamlit_app.py            entry point (Streamlit Cloud: select this file)
-app/core/                   extraction, parser, matching, validation, duplicates, decision, pipeline, metrics
-app/db/                     schema, engine (SQLite/Postgres), repository (all SQL)
-app/ui/                     components + the six views
-app/seed_data.py            fictional vendors and purchase orders
-app/sample_gen.py           invoice PDF generator (clean layouts A/B and scanned)
-sample_data/                7 invoice PDFs + vendors.csv + purchase_orders.json
-scripts/                    generate_samples, run_sample_sequence, init_db, export_schema
-tests/                      100 pytest tests
-db/                         generated schema SQL (Postgres, SQLite)
+streamlit_app.py      app entry point
+app/core/             extraction, parser, matching, validation, duplicates, decision, pipeline
+app/db/               database schema, engine (SQLite/PostgreSQL), queries
+app/ui/               the six pages and shared components
+sample_data/          the 7 sample invoices and the vendor/PO data
+scripts/              helper scripts (run samples, init database, generate samples)
+tests/                pytest tests
+docs/                 screenshots and browser test results
 ```
-More detail: `ARCHITECTURE.md`, `DEMO.md`, `TEST_REPORT.md`, `DEPLOYMENT_GUIDE.md`, `GITHUB_UPLOAD_GUIDE.md`.
 
-## Known limitations
-English-label invoices only; single-line descriptions (wrapped item descriptions are not joined); PO balance is tracked at PO level, not per line; no email sending (the vendor message is a draft you copy); no login/roles; emails and ERP integrations are out of scope. See `ARCHITECTURE.md`.
+More detail: [ARCHITECTURE.md](ARCHITECTURE.md), [DEMO.md](DEMO.md), [TEST_REPORT.md](TEST_REPORT.md).
+
+## Limitations
+
+Being honest about what is not done:
+
+- It works best on English invoices with clear labels. Unusual layouts will go to review rather than being guessed.
+- Item descriptions that wrap onto two lines are not joined together.
+- The PO balance is tracked per PO, not per line item.
+- There is no login. The reviewer name is just typed in.
+- The vendors and POs are fake demo data, not connected to a real ERP.
+- "Request vendor info" only saves a draft message. It does not send an email.
+
+
+## What I would do next
+
+- Read invoices straight from an email inbox
+- Connect to a real procurement or ERP system
+- Match against goods receipts too (3-way match)
+- Learn from reviewer corrections
+- Add proper login and approval limits
