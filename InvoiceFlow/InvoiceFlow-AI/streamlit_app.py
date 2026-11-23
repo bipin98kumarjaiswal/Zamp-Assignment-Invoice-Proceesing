@@ -1,13 +1,11 @@
 """InvoiceFlow AI - Streamlit entry point.  Run:  streamlit run streamlit_app.py"""
-import os
-
 import streamlit as st
 
 st.set_page_config(page_title="InvoiceFlow AI", page_icon=":material/receipt_long:", layout="wide",
                    initial_sidebar_state="expanded")
 
 from app.config import get_settings  # noqa: E402
-from app.db.engine import database_label, get_engine, is_postgres, reset_db  # noqa: E402
+from app.db.engine import database_label, get_engine  # noqa: E402
 from app.ui import components as ui  # noqa: E402
 from app.ui import pages  # noqa: E402
 
@@ -33,16 +31,7 @@ def _sidebar() -> None:
             ocr = "OCR unavailable (Tesseract not installed)"
         ai = "AI extraction on" if (s.use_ai_extraction and s.openai_api_key) else "AI extraction off (rules only)"
         st.caption(f"Database: {database_label(eng)}  \n{ocr} · {ai}  \nPrice tolerance ±{s.price_tolerance_pct}%")
-        allow = os.environ.get("ALLOW_DB_RESET")
-        allowed = (allow.lower() == "true") if allow else not is_postgres(eng)
-        if allowed:
-            with st.expander("Demo tools"):
-                sure = st.checkbox("Delete all runs and re-seed demo data")
-                if st.button("Reset demo database", disabled=not sure):
-                    reset_db(eng)
-                    for k in ("last_run_id", "selected_run"):
-                        st.session_state.pop(k, None)
-                    st.success("Database reset.")
+
 
 
 ui.inject_css()

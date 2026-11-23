@@ -1,6 +1,7 @@
 """The six Streamlit views. All numbers come from the database; nothing is hard-coded."""
 from __future__ import annotations
 
+import hmac
 import os
 import time
 from datetime import date, timedelta
@@ -10,12 +11,13 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from app.config import get_settings
+from app.config import get_settings, _secret
 from app.core.metrics import compute_metrics, filter_runs
 from app.core.models import RunResult
 from app.core.pipeline import STAGES, InvoicePipeline
 from app.core.utils import fmt_money
 from app.db import repo
+from app.db.demo_admin import delete_invoice, reset_demo_history
 from app.db.engine import get_engine
 from app.ui import components as ui
 from app.ui.samples import SAMPLES, sample_bytes
@@ -53,6 +55,76 @@ def _go_details(run_id: int) -> None:
     st.switch_page(PAGES["details"])
 
 
+# ============================================================================ Admin demo tools
+def _demo_management(runs: list[dict]) -> None:
+    # Never expose destructive controls on a public deployment without a secret.
+    password = _secret("ADMIN_PASSWORD")
+    if not password:
+        return
+    with st.expander("Demo management (admin only)", expanded=False):
+        if not st.session_state.get("demo_admin_authenticated", False):
+            with st.form("demo_login"):
+                candidate = st.text_input("Admin password", type="password")
+                login = st.form_submit_button("Unlock demo tools")
+            if login:
+                if hmac.compare_digest(candidate, password):
+                    st.session_state["demo_admin_authenticated"] = True
+                    st.rerun()
+                else:
+                    st.error("Incorrect admin password.")
+            return
+
+        if st.button("Lock demo tools", key="demo_logout"):
+            st.session_state["demo_admin_authenticated"] = False
+            st.rerun()
+        st.warning("Demo data only. These actions permanently remove invoices, documents and audit history.")
+        if runs:
+            lookup = {int(r["id"]): r for r in runs}
+            selected = st.selectbox(
+                "Invoice run to delete", list(lookup),
+                format_func=lambda rid: f"#{rid} · {lookup[rid]['filename']} · {lookup[rid]['decision']}",
+                key="demo_delete_run",
+            )
+            st.caption("Deleting a run also deletes its related re-validation history. An approved invoice's PO commitment is reversed.")
+            with st.form("demo_delete_form"):
+                confirmation = st.text_input(f"Type DELETE {selected} to confirm")
+                submitted = st.form_submit_button("Delete selected invoice")
+            if submitted:
+                if confirmation != f"DELETE {selected}":
+                    st.error("Confirmation did not match; nothing deleted.")
+                else:
+                    try:
+                        count = delete_invoice(_engine(), int(selected))
+                    except Exception as exc:
+                        st.error(f"Deletion cancelled: {exc}")
+                    else:
+                        for key in ("last_run_id", "selected_run", "hist_tbl"):
+                            st.session_state.pop(key, None)
+                        st.success(f"Deleted {count} related run(s).")
+                        st.rerun()
+        else:
+            st.info("There are no processed invoices to delete.")
+
+        with st.form("demo_reset_form"):
+            st.markdown("**Reset demo history**")
+            st.caption("Clears every processing run and review action. Demo vendors and purchase orders remain, with initial balances restored.")
+            reset_confirmation = st.text_input("Type RESET DEMO to confirm")
+            reset_submitted = st.form_submit_button("Reset all demo invoices")
+        if reset_submitted:
+            if reset_confirmation != "RESET DEMO":
+                st.error("Confirmation did not match; nothing reset.")
+            else:
+                try:
+                    count = reset_demo_history(_engine())
+                except Exception as exc:
+                    st.error(f"Reset cancelled: {exc}")
+                else:
+                    for key in ("last_run_id", "selected_run", "hist_tbl"):
+                        st.session_state.pop(key, None)
+                    st.success(f"Removed {count} runs and restored demo PO balances.")
+                    st.rerun()
+
+
 # ============================================================================ A. Overview
 def page_overview() -> None:
     ui.page_header("Overview", "Live totals from every invoice processed so far. Nothing on this page is hard-coded.")
@@ -66,6 +138,7 @@ def page_overview() -> None:
         ("Needs review", str(c["REVIEW"]), "#B07A10", f"{m['open_review']} still open in the queue"),
         ("Rejected", str(c["REJECTED"]), "#A8323A", "duplicates, blocked vendors, reviewer rejections"),
     ])
+    _demo_management(runs)
     if not runs:
         st.markdown("<div class='callout'>No invoices processed yet. Open <b>Process invoice</b> and try one of the sample PDFs.</div>",
                     unsafe_allow_html=True)
