@@ -1,0 +1,19 @@
+# secrets
+.env
+.streamlit/secrets.toml
+*.pem
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+# local databases and scratch
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+.DS_Store
+tmp/
