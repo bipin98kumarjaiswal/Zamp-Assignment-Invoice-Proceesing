@@ -59,9 +59,10 @@ def _go_details(run_id: int) -> None:
 def _demo_management(runs: list[dict]) -> None:
     # Never expose destructive controls on a public deployment without a secret.
     password = _secret("ADMIN_PASSWORD")
-    if not password:
-        return
     with st.expander("Demo management (admin only)", expanded=False):
+        if not password:
+            st.info("Admin tools are not configured for this deployment. In Streamlit Community Cloud, open Manage app → Settings → Secrets and add ADMIN_PASSWORD, then save and reboot the app.")
+            return
         if not st.session_state.get("demo_admin_authenticated", False):
             with st.form("demo_login"):
                 candidate = st.text_input("Admin password", type="password")
