@@ -1,0 +1,10 @@
+# Runtime dependencies (this is what Streamlit Community Cloud installs)
+streamlit>=1.50,<2
+pymupdf>=1.24.3
+pydantic>=2.6,<3
+sqlalchemy>=2.0,<3
+psycopg2-binary>=2.9
+pytesseract>=0.3.10
+pillow>=10.0
+pandas>=2.0
+python-dotenv>=1.0

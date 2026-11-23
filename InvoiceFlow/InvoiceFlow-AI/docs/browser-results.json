@@ -1,0 +1,137 @@
+[
+ {
+  "name": "nav: Process invoice",
+  "ok": true,
+  "detail": "h1=\"Process invoice\""
+ },
+ {
+  "name": "nav: Invoice history",
+  "ok": true,
+  "detail": "h1=\"Invoice history\""
+ },
+ {
+  "name": "nav: Review center",
+  "ok": true,
+  "detail": "h1=\"Review center\""
+ },
+ {
+  "name": "nav: Purchase orders",
+  "ok": true,
+  "detail": "h1=\"Purchase orders\""
+ },
+ {
+  "name": "nav: Run details",
+  "ok": true,
+  "detail": "h1=\"Run details\""
+ },
+ {
+  "name": "nav: Overview",
+  "ok": true,
+  "detail": "h1=\"Overview\""
+ },
+ {
+  "name": "empty overview shows invitation",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "upload+process 01-clean",
+  "ok": true,
+  "detail": "decision=\"APPROVED\" expected=\"Approved\" stages=10/10"
+ },
+ {
+  "name": "upload+process 02-small-variance",
+  "ok": true,
+  "detail": "decision=\"APPROVED\" expected=\"Approved\" stages=10/10"
+ },
+ {
+  "name": "upload+process 03-missing-po",
+  "ok": true,
+  "detail": "decision=\"NEEDS REVIEW\" expected=\"Needs review\" stages=10/10"
+ },
+ {
+  "name": "upload+process 04-duplicate",
+  "ok": true,
+  "detail": "decision=\"REJECTED\" expected=\"Rejected\" stages=10/10"
+ },
+ {
+  "name": "upload+process 05-vendor-mismatch",
+  "ok": true,
+  "detail": "decision=\"NEEDS REVIEW\" expected=\"Needs review\" stages=10/10"
+ },
+ {
+  "name": "upload+process 06-over-budget",
+  "ok": true,
+  "detail": "decision=\"NEEDS REVIEW\" expected=\"Needs review\" stages=10/10"
+ },
+ {
+  "name": "upload+process 07-scanned",
+  "ok": true,
+  "detail": "decision=\"NEEDS REVIEW\" expected=\"Needs review\" stages=10/10"
+ },
+ {
+  "name": "dashboard ledger 7/2/4/1",
+  "ok": true,
+  "detail": "7,2,4,1"
+ },
+ {
+  "name": "history lists all runs",
+  "ok": true,
+  "detail": "7 of 7 runs"
+ },
+ {
+  "name": "history search INV-10231 narrows results",
+  "ok": true,
+  "detail": "1 of 7 runs"
+ },
+ {
+  "name": "history search by vendor/invoice partial",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "history row select opens inspector",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "review queue lists 4 invoices",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "review: selecting run #3 shows its detail",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "review: no approve button exists",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "review: re-validation approves through the rules",
+  "ok": true,
+  "detail": "Re-validated as run #8. Approved: 26 checks passed. stamp=APPROVED"
+ },
+ {
+  "name": "dashboard after review: 7/3/3/1",
+  "ok": true,
+  "detail": "7,3,3,1"
+ },
+ {
+  "name": "PO select shows lines and linked invoices",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "run details tabs all open",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "no uncaught browser JS errors",
+  "ok": true,
+  "detail": ""
+ }
+]
